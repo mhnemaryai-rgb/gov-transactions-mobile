@@ -318,9 +318,9 @@ function formatDateTime(str){
   if(!str) return '—';
   const d = new Date(str);
   try{
-    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).format(d);
+    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', numberingSystem:'latn'}).format(d);
   }catch(e){
-    return d.toLocaleString('ar');
+    return d.toLocaleString('ar', {numberingSystem:'latn'});
   }
 }
 function updateHijriHint(inputId, hintId){
