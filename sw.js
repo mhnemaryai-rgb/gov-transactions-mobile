@@ -1,5 +1,5 @@
 // Service worker: يحاول الشبكة أولاً لجلب أحدث نسخة، ويستخدم النسخة المخزّنة فقط عند عدم توفر إنترنت.
-const CACHE_NAME = 'tx-tracker-mobile-v4';
+const CACHE_NAME = 'tx-tracker-mobile-v5';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -29,34 +29,5 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
-  );
-});
-
-// إشعارات Push حقيقية: تصل وتُعرض حتى لو كان التطبيق مغلقًا تمامًا.
-self.addEventListener('push', (event) => {
-  let payload = {};
-  try{
-    payload = event.data ? event.data.json() : {};
-  }catch(e){
-    payload = {title: 'تنبيه متابعة معاملة', body: event.data ? event.data.text() : ''};
-  }
-  const title = payload.title || 'تنبيه متابعة معاملة';
-  const options = {
-    body: payload.body || '',
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    dir: 'rtl',
-    lang: 'ar',
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({type: 'window', includeUncontrolled: true}).then((clientList) => {
-      for(const c of clientList){ if('focus' in c) return c.focus(); }
-      if(clients.openWindow) return clients.openWindow('./');
-    })
   );
 });
