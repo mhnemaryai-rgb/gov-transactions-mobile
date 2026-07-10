@@ -182,6 +182,7 @@
       <th>ورود القيد (تاريخ ووقت)</th>
       <th>المعالج</th>
       <th>رقم الصادر</th>
+      <th>تاريخ ووقت الصادر</th>
       <th>الأهمية</th>
       <th>الجهة / الموضوع</th>
       <th>مدة الإجراء</th>
@@ -426,6 +427,7 @@ function render(){
       <td data-label="ورود القيد">${escapeHtml(formatDateTime(tx.entryDateTime))}</td>
       <td data-label="المعالج">${escapeHtml(tx.handler || '—')}</td>
       <td data-label="رقم الصادر">${tx.issueNumber ? escapeHtml(tx.issueNumber) : '<span class="no-issue">لم يصدر بعد</span>'}</td>
+      <td data-label="تاريخ ووقت الصادر">${tx.issueNumber ? escapeHtml(formatDateTime(tx.issueDateTime)) : '<span class="no-issue">—</span>'}</td>
       <td data-label="الأهمية"><span class="pill pill-${tx.importance}">${IMPORTANCE_LABELS[tx.importance]}</span></td>
       <td data-label="الجهة/الموضوع">${escapeHtml(tx.department)}<br><span class="muted" style="font-size:12px">${escapeHtml(tx.subject)}</span></td>
       <td data-label="مدة الإجراء" style="min-width:170px">${durationInfo(tx)}${progressBarHtml(tx)}</td>
