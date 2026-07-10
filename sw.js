@@ -1,5 +1,5 @@
 // Service worker بسيط: يخزّن ملفات التطبيق مؤقتًا ليعمل بدون إنترنت بعد أول فتح.
-const CACHE_NAME = 'tx-tracker-mobile-v1';
+const CACHE_NAME = 'tx-tracker-mobile-v2';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

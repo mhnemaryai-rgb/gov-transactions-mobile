@@ -152,6 +152,7 @@
 <h1>نظام متابعة المعاملات</h1>
 <div class="subtitle">نسخة الجوال — تعمل بالكامل بدون إنترنت، وتُحفظ البيانات على هذا الجهاز فقط</div>
 <div class="offline-badge" id="offlineBadge">💾 بيانات محلية على هذا الجهاز</div>
+<div class="offline-badge">🌙 كل التواريخ المعروضة بالتقويم الهجري (أم القرى)</div>
 
 <div class="toolbar">
   <select id="filterStatus">
@@ -199,7 +200,7 @@
     <h2 id="modalTitle">معاملة جديدة</h2>
     <div class="row2">
       <div class="field"><label>رقم القيد</label><input type="text" id="f_entryNumber" placeholder="مثال: 456" inputmode="numeric"></div>
-      <div class="field"><label>تاريخ ووقت ورود القيد</label><input type="datetime-local" id="f_entryDateTime"></div>
+      <div class="field"><label>تاريخ ووقت ورود القيد (ميلادي)</label><input type="datetime-local" id="f_entryDateTime"><div class="note-hint" id="hijri_entryDateTime"></div></div>
     </div>
     <div class="row2">
       <div class="field"><label>اسم المعالج</label><input type="text" id="f_handler" placeholder="اسم الموظف المسؤول عن المعاملة"></div>
@@ -315,7 +316,17 @@ function formatHours(h){
 function formatDateTime(str){
   if(!str) return '—';
   const d = new Date(str);
-  return d.toLocaleString('ar', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  try{
+    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).format(d);
+  }catch(e){
+    return d.toLocaleString('ar');
+  }
+}
+function updateHijriHint(inputId, hintId){
+  const inp = document.getElementById(inputId);
+  const hint = document.getElementById(hintId);
+  if(!inp || !hint) return;
+  hint.textContent = inp.value ? ('الموافق بالهجري: ' + formatDateTime(inp.value)) : '';
 }
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -476,6 +487,8 @@ if('Notification' in window && Notification.permission === 'default'){
 const editModal = document.getElementById('editModal');
 document.getElementById('addBtn').addEventListener('click', () => openEdit(null));
 
+document.getElementById('f_entryDateTime').addEventListener('input', () => updateHijriHint('f_entryDateTime', 'hijri_entryDateTime'));
+
 document.getElementById('f_hasDuration').addEventListener('change', e => {
   document.getElementById('durationField').style.display = e.target.checked ? 'block' : 'none';
   document.getElementById('noDurationHint').style.display = e.target.checked ? 'none' : 'block';
@@ -492,6 +505,7 @@ function openEdit(id){
   document.getElementById('modalTitle').textContent = tx ? `تعديل المعاملة رقم ${tx.entryNumber}` : 'معاملة جديدة';
   document.getElementById('f_entryNumber').value = tx?.entryNumber || '';
   document.getElementById('f_entryDateTime').value = tx?.entryDateTime || nowInputValue();
+  updateHijriHint('f_entryDateTime', 'hijri_entryDateTime');
   document.getElementById('f_handler').value = tx?.handler || '';
   document.getElementById('f_importance').value = tx?.importance || 'normal';
   document.getElementById('f_department').value = tx?.department || '';
@@ -614,11 +628,13 @@ function renderIssueForm(tx){
     <div class="issue-box">
       <div class="row2">
         <div class="field" style="margin-bottom:6px"><label>رقم الصادر</label><input type="text" id="f_issueNumber" placeholder="أدخل رقم الصادر عند توفره" value="${escapeHtml(tx.issueNumber || '')}"></div>
-        <div class="field" style="margin-bottom:6px"><label>تاريخ ووقت الصادر</label><input type="datetime-local" id="f_issueDateTime" value="${tx.issueDateTime || nowInputValue()}"></div>
+        <div class="field" style="margin-bottom:6px"><label>تاريخ ووقت الصادر (ميلادي)</label><input type="datetime-local" id="f_issueDateTime" value="${tx.issueDateTime || nowInputValue()}"><div class="note-hint" id="hijri_issueDateTime"></div></div>
       </div>
       <button class="btn btn-primary btn-sm" id="registerIssueBtn">تسجيل الصادر</button>
       <div class="note-hint">تبقى المعاملة بدون رقم صادر حتى يتم تسجيله هنا.</div>
     </div>`;
+  updateHijriHint('f_issueDateTime', 'hijri_issueDateTime');
+  document.getElementById('f_issueDateTime').addEventListener('input', () => updateHijriHint('f_issueDateTime', 'hijri_issueDateTime'));
   document.getElementById('registerIssueBtn').addEventListener('click', () => {
     const num = document.getElementById('f_issueNumber').value.trim();
     const dt = document.getElementById('f_issueDateTime').value || nowInputValue();
@@ -664,7 +680,7 @@ function renderHistory(tx){
   box.innerHTML = tx.history.slice().reverse().map(h => `
     <div class="history-item">
       <div>${escapeHtml(h.text)}</div>
-      <div class="history-time">${new Date(h.time).toLocaleString('ar')}</div>
+      <div class="history-time">${formatDateTime(h.time)}</div>
     </div>
   `).join('') || '<div class="history-item">لا يوجد سجل بعد.</div>';
 }
@@ -821,4 +837,3 @@ if('serviceWorker' in navigator && (location.protocol === 'https:' || location.h
 </script>
 </body>
 </html>
-                              
