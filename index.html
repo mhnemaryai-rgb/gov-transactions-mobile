@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>متابعة المعاملات</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="متابعة المعاملات">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+    --border:#e5e7eb; --accent:#2563eb; --accent-dark:#1d4ed8;
+    --normal:#3b82f6; --urgent:#f59e0b; --secret:#7c3aed;
+    --status-processing:#64748b; --status-soon:#f59e0b; --status-late:#dc2626; --status-issued:#16a34a;
+    --wa:#25d366; --wa-dark:#1da851;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:'Segoe UI', Tahoma, Arial, sans-serif;
+    background:var(--bg); color:var(--text); padding:16px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  h1{font-size:19px; margin:0 0 4px}
+  .subtitle{color:var(--muted); font-size:12.5px; margin-bottom:16px}
+  .offline-badge{display:inline-flex; align-items:center; gap:5px; background:#eef2f7; color:var(--muted); font-size:11px; padding:3px 9px; border-radius:20px; margin-bottom:10px}
+  .toolbar{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    margin-bottom:16px; background:var(--card); padding:12px; border-radius:10px; border:1px solid var(--border);
+  }
+  .toolbar select, .toolbar input[type=text]{
+    padding:9px 10px; border-radius:6px; border:1px solid var(--border); font-size:14px;
+  }
+  .btn{
+    padding:10px 14px; border-radius:6px; border:none; cursor:pointer;
+    font-size:13px; font-weight:600;
+  }
+  .btn-primary{background:var(--accent); color:#fff}
+  .btn-primary:hover{background:var(--accent-dark)}
+  .btn-ghost{background:#fff; border:1px solid var(--border); color:var(--text)}
+  .btn-ghost:hover{background:#f1f3f5}
+  .btn-wa{background:var(--wa); color:#fff}
+  .btn-wa:hover{background:var(--wa-dark)}
+  .btn-sm{padding:6px 10px; font-size:12px}
+  .spacer{flex:1}
+  .alert-badge{
+    background:#fee2e2; color:#991b1b; padding:6px 12px; border-radius:20px;
+    font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;
+  }
+  table{width:100%; border-collapse:collapse; background:var(--card); border-radius:10px; overflow:hidden; border:1px solid var(--border)}
+  thead th{
+    background:#f8fafc; text-align:right; padding:10px; font-size:12px; color:var(--muted);
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:10px; font-size:12.5px; border-bottom:1px solid var(--border); vertical-align:top}
+  tbody tr:hover{background:#fafbfc}
+  .pill{
+    display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; color:#fff;
+  }
+  .pill-normal{background:var(--normal)}
+  .pill-urgent{background:var(--urgent)}
+  .pill-secret{background:var(--secret)}
+  .pill-processing{background:var(--status-processing)}
+  .pill-soon{background:var(--status-soon)}
+  .pill-late{background:var(--status-late)}
+  .pill-issued{background:var(--status-issued)}
+  .row-late{box-shadow: inset 4px 0 0 var(--status-late)}
+  .row-soon{box-shadow: inset 4px 0 0 var(--status-soon)}
+  .muted{color:var(--muted)}
+  .no-issue{color:var(--muted); font-style:italic; font-size:12px}
+  .icon-btn{
+    background:none; border:none; cursor:pointer; font-size:18px; padding:6px 8px; border-radius:5px;
+  }
+  .icon-btn:hover{background:#f1f3f5}
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(15,23,42,.5);
+    align-items:center; justify-content:center; z-index:50; overflow:auto; padding:16px 0;
+  }
+  .modal-overlay.open{display:flex}
+  .modal{
+    background:#fff; border-radius:12px; width:min(620px,94vw); max-height:90vh; overflow:auto;
+    padding:18px; position:relative;
+  }
+  .modal h2{margin:0 0 14px; font-size:16px}
+  .modal h3{margin:18px 0 8px; font-size:13px; color:var(--accent-dark); border-top:1px solid var(--border); padding-top:14px}
+  .field{margin-bottom:12px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:600}
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); font-size:15px; font-family:inherit;
+  }
+  .field textarea{min-height:70px; resize:vertical}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .modal-actions{display:flex; justify-content:flex-start; gap:8px; margin-top:16px; flex-wrap:wrap}
+  .history-box{
+    background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px; margin-top:8px;
+    max-height:160px; overflow:auto; font-size:12px;
+  }
+  .history-item{padding:6px 0; border-bottom:1px dashed var(--border)}
+  .history-item:last-child{border-bottom:none}
+  .history-time{color:var(--muted); font-size:11px}
+  .wa-preview{
+    background:#e9fbe9; border:1px solid #bfe8bf; border-radius:8px; padding:10px;
+    font-size:12px; white-space:pre-wrap; margin-top:8px; direction:rtl;
+  }
+  .empty-state{text-align:center; padding:40px; color:var(--muted); font-size:13px}
+  .note-hint{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.6}
+  .close-x{position:absolute; left:14px; top:14px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted); padding:4px}
+  .checkline{display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:8px}
+  .checkline input{width:auto}
+  .quarter-box{display:flex; gap:10px; flex-wrap:wrap; align-items:center; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px}
+  .quarter-item{display:flex; align-items:center; gap:5px; font-size:12px}
+  .quarter-item input{width:auto}
+  .summary-box{background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.9}
+  .issue-box{background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:10px 12px}
+  .issue-done{background:#f0fdf4; border:1px solid #bbf7d0}
+  .reminder-chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+  .chip{font-size:11px; background:#eef2f7; border:1px solid var(--border); padding:3px 9px; border-radius:20px}
+  .progress-outer{background:#e5e7eb; border-radius:4px; height:8px; overflow:hidden; margin-top:8px}
+  .progress-inner{height:100%; border-radius:4px}
+
+  /* ------- عرض الجوال: تحويل الجدول إلى بطاقات ------- */
+  @media (max-width: 720px){
+    body{padding:10px}
+    h1{font-size:17px}
+    .toolbar{flex-direction:column; align-items:stretch}
+    .toolbar > *{width:100%}
+    .toolbar .spacer{display:none}
+    table{border:none; background:none; border-collapse:separate; border-spacing:0}
+    thead{display:none}
+    tbody, tr, td{display:block; width:100%}
+    tbody tr{
+      background:var(--card); border:1px solid var(--border); border-radius:10px;
+      margin-bottom:12px; padding:8px 10px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+    }
+    tbody td{
+      border:none; padding:7px 2px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; font-size:13px;
+    }
+    tbody td::before{content:attr(data-label); font-weight:700; color:var(--muted); font-size:11px; flex-shrink:0; padding-top:1px}
+    tbody td:last-child{justify-content:flex-end; border-top:1px dashed var(--border); margin-top:4px; padding-top:8px}
+    .row2{grid-template-columns:1fr}
+    .modal{padding:14px}
+  }
+</style>
+</head>
+<body>
+
+<h1>نظام متابعة المعاملات</h1>
+<div class="subtitle">نسخة الجوال — تعمل بالكامل بدون إنترنت، وتُحفظ البيانات على هذا الجهاز فقط</div>
+<div class="offline-badge" id="offlineBadge">💾 بيانات محلية على هذا الجهاز</div>
+
+<div class="toolbar">
+  <select id="filterStatus">
+    <option value="">كل الحالات</option>
+    <option value="processing">قيد المعالجة</option>
+    <option value="soon">يقترب الموعد</option>
+    <option value="late">متأخر</option>
+    <option value="issued">تم التصدير</option>
+  </select>
+  <select id="filterImportance">
+    <option value="">كل الدرجات</option>
+    <option value="normal">عادي</option>
+    <option value="urgent">عاجل</option>
+    <option value="secret">سري</option>
+  </select>
+  <input type="text" id="searchBox" placeholder="بحث برقم القيد أو الموضوع أو المعالج...">
+  <div class="spacer"></div>
+  <div class="alert-badge" id="alertBadge" style="display:none"></div>
+  <button class="btn btn-ghost" id="parseWaBtn">📋 قراءة نص واتساب</button>
+  <button class="btn btn-primary" id="addBtn">+ معاملة جديدة</button>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>رقم القيد</th>
+      <th>ورود القيد (تاريخ ووقت)</th>
+      <th>المعالج</th>
+      <th>رقم الصادر</th>
+      <th>الأهمية</th>
+      <th>الجهة / الموضوع</th>
+      <th>مدة الإجراء</th>
+      <th>الحالة</th>
+      <th>إجراءات</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+<div id="emptyState" class="empty-state" style="display:none">لا توجد معاملات مطابقة. أضف معاملة جديدة للبدء.</div>
+
+<!-- Modal: Add/Edit -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="close-x" data-close>✕</button>
+    <h2 id="modalTitle">معاملة جديدة</h2>
+    <div class="row2">
+      <div class="field"><label>رقم القيد</label><input type="text" id="f_entryNumber" placeholder="مثال: 456" inputmode="numeric"></div>
+      <div class="field"><label>تاريخ ووقت ورود القيد</label><input type="datetime-local" id="f_entryDateTime"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>اسم المعالج</label><input type="text" id="f_handler" placeholder="اسم الموظف المسؤول عن المعاملة"></div>
+      <div class="field"><label>درجة الأهمية</label>
+        <select id="f_importance"><option value="normal">عادي</option><option value="urgent">عاجل</option><option value="secret">سري</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>الجهة المعنية</label><input type="text" id="f_department" placeholder="اسم الجهة"></div>
+      <div class="field"><label>الموضوع</label><input type="text" id="f_subject" placeholder="موضوع المعاملة"></div>
+    </div>
+
+    <h3>مدة الإنجاز (اختياري، بالساعات)</h3>
+    <div class="checkline"><input type="checkbox" id="f_hasDuration"><label for="f_hasDuration" style="margin:0">لهذه المعاملة مدة إنجاز محددة</label></div>
+    <div class="field" id="durationField" style="display:none">
+      <label>مدة الإنجاز بالساعات</label>
+      <input type="number" id="f_durationHours" min="1" step="0.5" placeholder="مثال: 4 ساعات، 24 ساعة، 72 ساعة" inputmode="decimal">
+      <div class="note-hint">تُحسب المدة من لحظة ورود القيد. تصلح للمعاملات العاجلة بالساعات وللمعاملات الممتدة بأيام.</div>
+    </div>
+    <div class="note-hint" id="noDurationHint">بدون مدة محددة: تُعرض المعاملة "قيد المعالجة" فقط دون احتساب تأخير.</div>
+
+    <h3>وسائل التنبيه لهذه المعاملة</h3>
+    <div class="checkline"><input type="checkbox" checked disabled> <span>تنبيه داخل النظام (سجل تلقائي دائم)</span></div>
+    <div class="checkline"><input type="checkbox" id="f_remind_browser"><label for="f_remind_browser" style="margin:0">إشعار على هذا الجهاز عند بلوغ نقاط التنبيه</label></div>
+    <div class="checkline"><input type="checkbox" id="f_remind_wa"><label for="f_remind_wa" style="margin:0">وضع علامة "بحاجة لتذكير عبر واتساب"</label></div>
+
+    <div class="field" id="quartersField" style="display:none">
+      <label>التنبيه عند بلوغ أرباع مدة الإنجاز</label>
+      <div class="quarter-box">
+        <span class="quarter-item"><input type="checkbox" id="f_q1"> <label for="f_q1">الأول (25%)</label></span>
+        <span class="quarter-item"><input type="checkbox" id="f_q2"> <label for="f_q2">الثاني (50%)</label></span>
+        <span class="quarter-item"><input type="checkbox" id="f_q3"> <label for="f_q3">الثالث (75%)</label></span>
+        <span class="quarter-item"><input type="checkbox" id="f_q4"> <label for="f_q4">الرابع (عند الانتهاء)</label></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="q_all">تحديد الكل</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="saveBtn">حفظ</button>
+      <button class="btn btn-ghost" data-close>إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Details -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <button class="close-x" data-close>✕</button>
+    <h2 id="detailTitle">تفاصيل المعاملة</h2>
+    <div class="summary-box" id="summaryBox"></div>
+    <h3>رقم الصادر</h3>
+    <div id="issueSection"></div>
+    <h3>وسائل التنبيه المفعّلة</h3>
+    <div class="reminder-chips" id="reminderChips"></div>
+    <h3>نص جاهز للمشاركة عبر واتساب</h3>
+    <div class="wa-preview" id="waPreviewText"></div>
+    <div class="note-hint">يفتح واتساب مع النص جاهزًا لاختيار المستلم وإرساله.</div>
+    <div style="margin-top:8px" class="modal-actions">
+      <button class="btn btn-wa" id="waShareBtn">مشاركة تحديث</button>
+      <button class="btn btn-wa" id="waReminderBtn">مشاركة كتذكير</button>
+      <button class="btn btn-ghost" id="copyBtn">نسخ النص</button>
+    </div>
+    <h3>توثيق رد / تحديث وارد من واتساب</h3>
+    <div class="field">
+      <textarea id="f_incomingNote" placeholder="الصق هنا نص الرد الوارد من واتساب لتوثيقه في السجل..."></textarea>
+      <button class="btn btn-primary" id="addNoteBtn" style="margin-top:8px">إضافة إلى سجل المتابعة</button>
+    </div>
+    <h3>السجل الزمني (History)</h3>
+    <div class="history-box" id="historyBox"></div>
+  </div>
+</div>
+
+<!-- Modal: قراءة نص واتساب -->
+<div class="modal-overlay" id="parseModal">
+  <div class="modal">
+    <button class="close-x" data-close>✕</button>
+    <h2>قراءة نص من واتساب</h2>
+    <div class="note-hint" style="margin-bottom:10px">
+      الصق نص الرسالة، كل معلومة في سطر مستقل بصيغة "الحقل: القيمة"، مثل:<br>
+      رقم القيد: 456<br>
+      الحالة: صدر<br>
+      رقم الصادر: 921<br>
+      المعالج: أحمد<br>
+      الحقول المدعومة: رقم القيد، رقم الصادر، المعالج، الجهة، الموضوع، الأهمية.
+    </div>
+    <div class="field">
+      <textarea id="waRawText" style="min-height:130px" placeholder="الصق النص هنا..."></textarea>
+    </div>
+    <button class="btn btn-primary" id="parseBtn">تحليل النص</button>
+    <div id="parseResult" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'txTrackerMobileData_v1';
+const STATUS_LABELS = {processing:'قيد المعالجة', soon:'يقترب الموعد', late:'متأخر', issued:'تم التصدير'};
+const IMPORTANCE_LABELS = {normal:'عادي', urgent:'عاجل', secret:'سري'};
+const QUARTER_LABELS = ['الأول','الثاني','الثالث','الرابع'];
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function toInputValue(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function nowInputValue(){ return toInputValue(new Date()); }
+function cryptoId(){ return 'tx_' + Math.random().toString(36).slice(2,10); }
+function hoursBetween(fromStr, toStr){ return (new Date(toStr) - new Date(fromStr)) / (1000*60*60); }
+function formatHours(h){
+  const sign = h < 0 ? '-' : '';
+  h = Math.abs(h);
+  const days = Math.floor(h/24);
+  const rem = Math.round((h - days*24) * 10) / 10;
+  if(days > 0) return `${sign}${days} يوم${rem > 0 ? ` و${rem} ساعة` : ''}`;
+  return `${sign}${Math.round(h*10)/10} ساعة`;
+}
+function formatDateTime(str){
+  if(!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleString('ar', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw) return JSON.parse(raw);
+  const hoursAgo = n => { const d = new Date(); d.setHours(d.getHours()-n); return toInputValue(d); };
+  const seed = [
+    {id:cryptoId(), entryNumber:'456', entryDateTime: hoursAgo(4.5), handler:'أحمد الشمري', issueNumber:'', issueDateTime:'', importance:'urgent', department:'ديوان المحافظة', subject:'طلب اعتماد ميزانية تشغيلية عاجلة', hasDuration:true, durationHours:6, reminders:{browser:true, whatsapp:true, quarters:{q1:true,q2:true,q3:true,q4:true}}, notifiedQuarters:[1,2], history:[{time:new Date(new Date().setHours(new Date().getHours()-4.5)).toISOString(), text:'تم إنشاء المعاملة'}]},
+    {id:cryptoId(), entryNumber:'457', entryDateTime: hoursAgo(30), handler:'منى العتيبي', issueNumber:'', issueDateTime:'', importance:'secret', department:'الشؤون القانونية', subject:'مذكرة سرية بخصوص عقد', hasDuration:false, durationHours:null, reminders:{browser:false, whatsapp:false, quarters:{q1:false,q2:false,q3:false,q4:false}}, notifiedQuarters:[], history:[{time:new Date(new Date().setHours(new Date().getHours()-30)).toISOString(), text:'تم إنشاء المعاملة'}]},
+  ];
+  saveData(seed);
+  return seed;
+}
+function saveData(d){ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+let data = loadData();
+let currentEditId = null;
+let currentDetailId = null;
+let pendingRawWaText = null;
+
+const tableBody = document.getElementById('tableBody');
+const emptyState = document.getElementById('emptyState');
+const alertBadge = document.getElementById('alertBadge');
+
+function elapsedHoursOf(tx){
+  const end = tx.issueNumber ? tx.issueDateTime : nowInputValue();
+  return hoursBetween(tx.entryDateTime, end);
+}
+function computeStatus(tx){
+  if(tx.issueNumber) return 'issued';
+  if(!tx.hasDuration || !tx.durationHours) return 'processing';
+  const percent = (elapsedHoursOf(tx) / tx.durationHours) * 100;
+  if(percent >= 100) return 'late';
+  if(percent >= 75) return 'soon';
+  return 'processing';
+}
+function durationInfo(tx){
+  const elapsed = elapsedHoursOf(tx);
+  if(!tx.hasDuration || !tx.durationHours){
+    return tx.issueNumber ? `استغرقت ${formatHours(elapsed)} حتى التصدير` : `منذ الورود: ${formatHours(elapsed)} — بدون مدة محددة`;
+  }
+  const remaining = tx.durationHours - elapsed;
+  const percent = Math.round(Math.min(100, Math.max(0, (elapsed/tx.durationHours)*100)));
+  if(tx.issueNumber) return `صدرت خلال ${formatHours(elapsed)} من أصل ${formatHours(tx.durationHours)} المحددة`;
+  if(remaining < 0) return `تجاوز المدة المحددة (${formatHours(tx.durationHours)}) بمقدار ${formatHours(Math.abs(remaining))} — ${percent}% منقضي`;
+  return `متبقي ${formatHours(remaining)} من أصل ${formatHours(tx.durationHours)} — ${percent}% منقضي`;
+}
+function progressBarHtml(tx){
+  if(!tx.hasDuration || !tx.durationHours || tx.issueNumber) return '';
+  const elapsed = elapsedHoursOf(tx);
+  const percent = Math.round(Math.min(100, Math.max(0, (elapsed/tx.durationHours)*100)));
+  const color = percent >= 100 ? 'var(--status-late)' : (percent >= 75 ? 'var(--status-soon)' : 'var(--accent)');
+  return `<div class="progress-outer"><div class="progress-inner" style="width:${percent}%;background:${color}"></div></div>`;
+}
+
+function render(){
+  const statusFilter = document.getElementById('filterStatus').value;
+  const importanceFilter = document.getElementById('filterImportance').value;
+  const search = document.getElementById('searchBox').value.trim().toLowerCase();
+
+  checkQuarterAlerts();
+
+  let rows = data.map(tx => ({...tx, effectiveStatus: computeStatus(tx)}));
+
+  if(statusFilter) rows = rows.filter(r => r.effectiveStatus === statusFilter);
+  if(importanceFilter) rows = rows.filter(r => r.importance === importanceFilter);
+  if(search){
+    rows = rows.filter(r =>
+      r.entryNumber.toLowerCase().includes(search) ||
+      (r.subject||'').toLowerCase().includes(search) ||
+      (r.department||'').toLowerCase().includes(search) ||
+      (r.handler||'').toLowerCase().includes(search)
+    );
+  }
+
+  const statusRank = {late:0, soon:1, processing:2, issued:3};
+  rows.sort((a,b) => statusRank[a.effectiveStatus] - statusRank[b.effectiveStatus]);
+
+  tableBody.innerHTML = '';
+  emptyState.style.display = rows.length ? 'none' : 'block';
+
+  let soonCount = 0, lateCount = 0;
+
+  rows.forEach(tx => {
+    if(tx.effectiveStatus === 'late') lateCount++;
+    if(tx.effectiveStatus === 'soon') soonCount++;
+
+    const tr = document.createElement('tr');
+    if(tx.effectiveStatus === 'late') tr.classList.add('row-late');
+    else if(tx.effectiveStatus === 'soon') tr.classList.add('row-soon');
+
+    tr.innerHTML = `
+      <td data-label="رقم القيد"><strong>${escapeHtml(tx.entryNumber)}</strong></td>
+      <td data-label="ورود القيد">${escapeHtml(formatDateTime(tx.entryDateTime))}</td>
+      <td data-label="المعالج">${escapeHtml(tx.handler || '—')}</td>
+      <td data-label="رقم الصادر">${tx.issueNumber ? escapeHtml(tx.issueNumber) : '<span class="no-issue">لم يصدر بعد</span>'}</td>
+      <td data-label="الأهمية"><span class="pill pill-${tx.importance}">${IMPORTANCE_LABELS[tx.importance]}</span></td>
+      <td data-label="الجهة/الموضوع">${escapeHtml(tx.department)}<br><span class="muted" style="font-size:12px">${escapeHtml(tx.subject)}</span></td>
+      <td data-label="مدة الإجراء" style="min-width:170px">${durationInfo(tx)}${progressBarHtml(tx)}</td>
+      <td data-label="الحالة"><span class="pill pill-${tx.effectiveStatus}">${STATUS_LABELS[tx.effectiveStatus]}</span></td>
+      <td data-label="">
+        <button class="icon-btn" title="تفاصيل / واتساب" data-detail="${tx.id}">💬</button>
+        <button class="icon-btn" title="تعديل" data-edit="${tx.id}">✎</button>
+        <button class="icon-btn" title="حذف" data-del="${tx.id}">🗑</button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+
+  if(lateCount || soonCount){
+    alertBadge.style.display = 'flex';
+    alertBadge.textContent = `⚠ ${lateCount} متأخرة، ${soonCount} تقترب من موعدها`;
+  } else {
+    alertBadge.style.display = 'none';
+  }
+
+  tableBody.querySelectorAll('[data-detail]').forEach(b => b.addEventListener('click', () => openDetail(b.dataset.detail)));
+  tableBody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.edit)));
+  tableBody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteTx(b.dataset.del)));
+
+  if(currentDetailId && detailModal.classList.contains('open')) refreshDetail();
+}
+
+function checkQuarterAlerts(){
+  let changed = false;
+  data.forEach(tx => {
+    if(tx.issueNumber || !tx.hasDuration || !tx.durationHours) return;
+    const percent = (elapsedHoursOf(tx) / tx.durationHours) * 100;
+    const reached = [];
+    if(percent >= 25) reached.push(1);
+    if(percent >= 50) reached.push(2);
+    if(percent >= 75) reached.push(3);
+    if(percent >= 100) reached.push(4);
+    reached.forEach(qn => {
+      const key = 'q' + qn;
+      if(!tx.reminders?.quarters?.[key]) return;
+      if(tx.notifiedQuarters.includes(qn)) return;
+      tx.notifiedQuarters.push(qn);
+      changed = true;
+      const text = `بلغت المعاملة رقم ${tx.entryNumber} الربع ${QUARTER_LABELS[qn-1]} من مدة الإنجاز المحددة.`;
+      tx.history.push({time:new Date().toISOString(), text:'تنبيه نظام: ' + text});
+      if(tx.reminders.browser && 'Notification' in window && Notification.permission === 'granted'){
+        new Notification('تنبيه متابعة معاملة', {body:text});
+      }
+    });
+  });
+  if(changed) saveData(data);
+}
+
+if('Notification' in window && Notification.permission === 'default'){
+  // لا نطلب الإذن تلقائيًا؛ نتركه اختياريًا عبر تفاعل المستخدم لاحقًا إن رغب (يمكن إضافته من إعدادات الجهاز).
+}
+
+// --- Add/Edit modal ---
+const editModal = document.getElementById('editModal');
+document.getElementById('addBtn').addEventListener('click', () => openEdit(null));
+
+document.getElementById('f_hasDuration').addEventListener('change', e => {
+  document.getElementById('durationField').style.display = e.target.checked ? 'block' : 'none';
+  document.getElementById('noDurationHint').style.display = e.target.checked ? 'none' : 'block';
+  document.getElementById('quartersField').style.display = e.target.checked ? 'block' : 'none';
+});
+document.getElementById('q_all').addEventListener('click', () => {
+  const allChecked = ['f_q1','f_q2','f_q3','f_q4'].every(id => document.getElementById(id).checked);
+  ['f_q1','f_q2','f_q3','f_q4'].forEach(id => document.getElementById(id).checked = !allChecked);
+});
+
+function openEdit(id){
+  currentEditId = id;
+  const tx = id ? data.find(t => t.id === id) : null;
+  document.getElementById('modalTitle').textContent = tx ? `تعديل المعاملة رقم ${tx.entryNumber}` : 'معاملة جديدة';
+  document.getElementById('f_entryNumber').value = tx?.entryNumber || '';
+  document.getElementById('f_entryDateTime').value = tx?.entryDateTime || nowInputValue();
+  document.getElementById('f_handler').value = tx?.handler || '';
+  document.getElementById('f_importance').value = tx?.importance || 'normal';
+  document.getElementById('f_department').value = tx?.department || '';
+  document.getElementById('f_subject').value = tx?.subject || '';
+  const hasDuration = tx?.hasDuration || false;
+  document.getElementById('f_hasDuration').checked = hasDuration;
+  document.getElementById('durationField').style.display = hasDuration ? 'block' : 'none';
+  document.getElementById('noDurationHint').style.display = hasDuration ? 'none' : 'block';
+  document.getElementById('quartersField').style.display = hasDuration ? 'block' : 'none';
+  document.getElementById('f_durationHours').value = tx?.durationHours || '';
+  document.getElementById('f_remind_browser').checked = tx?.reminders?.browser || false;
+  document.getElementById('f_remind_wa').checked = tx?.reminders?.whatsapp || false;
+  document.getElementById('f_q1').checked = tx?.reminders?.quarters?.q1 || false;
+  document.getElementById('f_q2').checked = tx?.reminders?.quarters?.q2 || false;
+  document.getElementById('f_q3').checked = tx?.reminders?.quarters?.q3 || false;
+  document.getElementById('f_q4').checked = tx?.reminders?.quarters?.q4 || false;
+  editModal.classList.add('open');
+}
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const entryNumber = document.getElementById('f_entryNumber').value.trim();
+  const entryDateTime = document.getElementById('f_entryDateTime').value;
+  const hasDuration = document.getElementById('f_hasDuration').checked;
+  const durationHours = hasDuration ? Number(document.getElementById('f_durationHours').value) : null;
+  if(!entryNumber || !entryDateTime){ alert('يرجى تعبئة رقم القيد وتاريخ ووقت الورود على الأقل.'); return; }
+  if(hasDuration && (!durationHours || durationHours <= 0)){ alert('حددت أن للمعاملة مدة إنجاز، يرجى إدخال عدد الساعات.'); return; }
+
+  const payload = {
+    entryNumber, entryDateTime,
+    handler: document.getElementById('f_handler').value.trim(),
+    importance: document.getElementById('f_importance').value,
+    department: document.getElementById('f_department').value.trim(),
+    subject: document.getElementById('f_subject').value.trim(),
+    hasDuration, durationHours,
+    reminders: {
+      browser: document.getElementById('f_remind_browser').checked,
+      whatsapp: document.getElementById('f_remind_wa').checked,
+      quarters: {
+        q1: document.getElementById('f_q1').checked,
+        q2: document.getElementById('f_q2').checked,
+        q3: document.getElementById('f_q3').checked,
+        q4: document.getElementById('f_q4').checked,
+      },
+    },
+  };
+
+  if(currentEditId){
+    const tx = data.find(t => t.id === currentEditId);
+    Object.assign(tx, payload);
+    tx.history.push({time:new Date().toISOString(), text:'تم تعديل بيانات المعاملة'});
+  } else {
+    const newTx = {id:cryptoId(), issueNumber:'', issueDateTime:'', notifiedQuarters:[], ...payload, history:[{time:new Date().toISOString(), text:'تم إنشاء المعاملة'}]};
+    if(pendingRawWaText){
+      newTx.history.push({time:new Date().toISOString(), text:'أُنشئت من نص واتساب: ' + pendingRawWaText});
+      pendingRawWaText = null;
+    }
+    data.push(newTx);
+  }
+  saveData(data);
+  editModal.classList.remove('open');
+  render();
+});
+
+function deleteTx(id){
+  if(!confirm('حذف هذه المعاملة نهائيًا؟')) return;
+  data = data.filter(t => t.id !== id);
+  saveData(data);
+  render();
+}
+
+// --- Detail modal ---
+const detailModal = document.getElementById('detailModal');
+
+function openDetail(id){
+  currentDetailId = id;
+  refreshDetail();
+  detailModal.classList.add('open');
+}
+
+function refreshDetail(){
+  const tx = data.find(t => t.id === currentDetailId);
+  if(!tx){ detailModal.classList.remove('open'); return; }
+  const status = computeStatus(tx);
+  document.getElementById('detailTitle').textContent = `القيد رقم ${tx.entryNumber} — ${tx.subject || ''}`;
+
+  document.getElementById('summaryBox').innerHTML = `
+    <strong>الحالة الحالية:</strong> <span class="pill pill-${status}">${STATUS_LABELS[status]}</span><br>
+    <strong>ورود القيد:</strong> ${escapeHtml(formatDateTime(tx.entryDateTime))}<br>
+    <strong>المعالج:</strong> ${escapeHtml(tx.handler || '—')}<br>
+    <strong>مدة الإجراء:</strong> ${durationInfo(tx)}
+    ${progressBarHtml(tx)}
+  `;
+
+  const issueSection = document.getElementById('issueSection');
+  if(tx.issueNumber){
+    issueSection.innerHTML = `
+      <div class="issue-box issue-done">
+        صدرت المعاملة برقم صادر <strong>${escapeHtml(tx.issueNumber)}</strong> بتاريخ ${escapeHtml(formatDateTime(tx.issueDateTime))}.
+        <div style="margin-top:8px"><button class="btn btn-ghost btn-sm" id="editIssueBtn">تعديل رقم الصادر</button></div>
+      </div>`;
+    document.getElementById('editIssueBtn').addEventListener('click', () => renderIssueForm(tx));
+  } else {
+    renderIssueForm(tx);
+  }
+
+  const chips = ['<span class="chip">تنبيه داخل النظام</span>'];
+  if(tx.reminders?.browser) chips.push('<span class="chip">إشعار على الجهاز</span>');
+  if(tx.reminders?.whatsapp) chips.push('<span class="chip">تذكير واتساب</span>');
+  if(tx.hasDuration) ['q1','q2','q3','q4'].forEach((k,i) => { if(tx.reminders?.quarters?.[k]) chips.push(`<span class="chip">تنبيه الربع ${QUARTER_LABELS[i]}</span>`); });
+  document.getElementById('reminderChips').innerHTML = chips.join(' ');
+
+  document.getElementById('waPreviewText').textContent = buildWaText(tx, 'update');
+  document.getElementById('f_incomingNote').value = '';
+  renderHistory(tx);
+}
+
+function renderIssueForm(tx){
+  const issueSection = document.getElementById('issueSection');
+  issueSection.innerHTML = `
+    <div class="issue-box">
+      <div class="row2">
+        <div class="field" style="margin-bottom:6px"><label>رقم الصادر</label><input type="text" id="f_issueNumber" placeholder="أدخل رقم الصادر عند توفره" value="${escapeHtml(tx.issueNumber || '')}"></div>
+        <div class="field" style="margin-bottom:6px"><label>تاريخ ووقت الصادر</label><input type="datetime-local" id="f_issueDateTime" value="${tx.issueDateTime || nowInputValue()}"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="registerIssueBtn">تسجيل الصادر</button>
+      <div class="note-hint">تبقى المعاملة بدون رقم صادر حتى يتم تسجيله هنا.</div>
+    </div>`;
+  document.getElementById('registerIssueBtn').addEventListener('click', () => {
+    const num = document.getElementById('f_issueNumber').value.trim();
+    const dt = document.getElementById('f_issueDateTime').value || nowInputValue();
+    if(!num){ alert('أدخل رقم الصادر.'); return; }
+    tx.issueNumber = num;
+    tx.issueDateTime = dt;
+    tx.history.push({time:new Date().toISOString(), text:`تسجيل رقم الصادر: ${num} بتاريخ ${formatDateTime(dt)}`});
+    saveData(data);
+    refreshDetail();
+    render();
+  });
+}
+
+function buildWaText(tx, mode){
+  const status = computeStatus(tx);
+  const statusText = STATUS_LABELS[status];
+  const issueText = tx.issueNumber ? `${tx.issueNumber} (${formatDateTime(tx.issueDateTime)})` : 'لم يصدر بعد';
+  if(mode === 'reminder'){
+    return [
+      `تذكير متابعة — القيد رقم ${tx.entryNumber}`,
+      `المعالج: ${tx.handler || '—'}`,
+      `الموضوع: ${tx.subject || '—'}`,
+      `الحالة: ${statusText}`,
+      `رقم الصادر: ${issueText}`,
+      `مدة الإجراء: ${durationInfo(tx)}`,
+    ].join('\n');
+  }
+  return [
+    `رقم القيد: ${tx.entryNumber}`,
+    `ورود القيد: ${formatDateTime(tx.entryDateTime)}`,
+    `المعالج: ${tx.handler || '—'}`,
+    `رقم الصادر: ${issueText}`,
+    `الموضوع: ${tx.subject || '—'}`,
+    `الجهة: ${tx.department || '—'}`,
+    `الأهمية: ${IMPORTANCE_LABELS[tx.importance]}`,
+    `الحالة: ${statusText}`,
+    `تاريخ التحديث: ${formatDateTime(nowInputValue())}`,
+  ].join('\n');
+}
+
+function renderHistory(tx){
+  const box = document.getElementById('historyBox');
+  box.innerHTML = tx.history.slice().reverse().map(h => `
+    <div class="history-item">
+      <div>${escapeHtml(h.text)}</div>
+      <div class="history-time">${new Date(h.time).toLocaleString('ar')}</div>
+    </div>
+  `).join('') || '<div class="history-item">لا يوجد سجل بعد.</div>';
+}
+
+document.getElementById('waShareBtn').addEventListener('click', () => {
+  const tx = data.find(t => t.id === currentDetailId);
+  const text = encodeURIComponent(buildWaText(tx, 'update'));
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+  tx.history.push({time:new Date().toISOString(), text:'تم إنشاء ومشاركة نص تحديث عبر واتساب'});
+  saveData(data);
+  renderHistory(tx);
+});
+document.getElementById('waReminderBtn').addEventListener('click', () => {
+  const tx = data.find(t => t.id === currentDetailId);
+  const text = encodeURIComponent(buildWaText(tx, 'reminder'));
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+  tx.history.push({time:new Date().toISOString(), text:'تم إنشاء ومشاركة نص تذكير عبر واتساب'});
+  saveData(data);
+  renderHistory(tx);
+});
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const tx = data.find(t => t.id === currentDetailId);
+  navigator.clipboard?.writeText(buildWaText(tx, 'update'));
+});
+document.getElementById('addNoteBtn').addEventListener('click', () => {
+  const tx = data.find(t => t.id === currentDetailId);
+  const note = document.getElementById('f_incomingNote').value.trim();
+  if(!note) return;
+  tx.history.push({time:new Date().toISOString(), text:'رد/تحديث وارد عبر واتساب: ' + note});
+  saveData(data);
+  document.getElementById('f_incomingNote').value = '';
+  renderHistory(tx);
+  render();
+});
+
+// --- قراءة نص واتساب ---
+const parseModal = document.getElementById('parseModal');
+document.getElementById('parseWaBtn').addEventListener('click', () => {
+  document.getElementById('waRawText').value = '';
+  document.getElementById('parseResult').innerHTML = '';
+  parseModal.classList.add('open');
+});
+
+const FIELD_LABELS = {
+  entryNumber: ['رقم القيد', 'القيد رقم'],
+  issueNumber: ['رقم الصادر', 'الصادر رقم'],
+  handler: ['المعالج', 'المسؤول'],
+  department: ['الجهة'],
+  subject: ['الموضوع'],
+  importance: ['الأهمية', 'الاهمية'],
+  status: ['الحالة'],
+};
+const FIELD_LABELS_AR = {entryNumber:'رقم القيد', issueNumber:'رقم الصادر', handler:'المعالج', department:'الجهة', subject:'الموضوع', importance:'الأهمية', status:'الحالة (نص للاطلاع فقط)'};
+
+function normalizeArabicDigits(s){
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+  return s.replace(/[٠-٩]/g, d => map[d]);
+}
+
+function parseWaText(raw){
+  const result = {};
+  const allLabels = Object.entries(FIELD_LABELS).flatMap(([key, labels]) => labels.map(l => [key, l]));
+  allLabels.sort((a,b) => b[1].length - a[1].length);
+  raw.split(/\r?\n/).forEach(lineRaw => {
+    const line = normalizeArabicDigits(lineRaw.trim());
+    if(!line) return;
+    for(const [key, label] of allLabels){
+      if(line.startsWith(label)){
+        let rest = line.slice(label.length).trim().replace(/^[:\-–—]\s*/, '');
+        if(rest){ result[key] = rest; }
+        break;
+      }
+    }
+  });
+  if(result.importance){
+    const rev = Object.entries(IMPORTANCE_LABELS).find(([k,v]) => result.importance.includes(v));
+    if(rev) result.importance = rev[0]; else delete result.importance;
+  }
+  return result;
+}
+
+document.getElementById('parseBtn').addEventListener('click', () => {
+  const raw = document.getElementById('waRawText').value;
+  const parsed = parseWaText(raw);
+  const box = document.getElementById('parseResult');
+
+  if(Object.keys(parsed).length === 0){
+    box.innerHTML = '<div class="note-hint">لم أتمكن من التعرف على أي حقل. تأكد أن كل معلومة في سطر مستقل بصيغة "رقم القيد: 456" مثلًا.</div>';
+    return;
+  }
+
+  const existing = parsed.entryNumber ? data.find(t => t.entryNumber === parsed.entryNumber) : null;
+  let html = '<div class="summary-box">تم التعرف على:<br>' +
+    Object.entries(parsed).map(([k,v]) => `<strong>${FIELD_LABELS_AR[k]||k}:</strong> ${escapeHtml(v)}`).join('<br>') +
+    '</div>';
+
+  if(existing){
+    html += `<div class="note-hint" style="margin-top:8px">توجد معاملة بنفس رقم القيد (${escapeHtml(existing.entryNumber)} — ${escapeHtml(existing.subject||'')}). يمكنك تحديثها بالبيانات المكتشفة.</div>`;
+    html += `<div class="modal-actions"><button class="btn btn-primary btn-sm" id="applyUpdateBtn">تحديث المعاملة الموجودة</button></div>`;
+  } else {
+    html += `<div class="note-hint" style="margin-top:8px">لا توجد معاملة بنفس رقم القيد. يمكنك إنشاء معاملة جديدة وستُملأ الحقول المكتشفة تلقائيًا لمراجعتها قبل الحفظ.</div>`;
+    html += `<div class="modal-actions"><button class="btn btn-primary btn-sm" id="applyCreateBtn">إنشاء معاملة جديدة بهذه البيانات</button></div>`;
+  }
+  box.innerHTML = html;
+
+  if(existing){
+    document.getElementById('applyUpdateBtn').addEventListener('click', () => {
+      if(parsed.issueNumber && !existing.issueNumber){
+        existing.issueNumber = parsed.issueNumber;
+        existing.issueDateTime = nowInputValue();
+      }
+      if(parsed.handler) existing.handler = parsed.handler;
+      if(parsed.department) existing.department = parsed.department;
+      if(parsed.subject) existing.subject = parsed.subject;
+      if(parsed.importance) existing.importance = parsed.importance;
+      existing.history.push({time:new Date().toISOString(), text:'تحديث عبر قراءة نص واتساب: ' + raw.trim()});
+      saveData(data);
+      render();
+      parseModal.classList.remove('open');
+      alert('تم تحديث المعاملة رقم ' + existing.entryNumber);
+    });
+  } else {
+    document.getElementById('applyCreateBtn').addEventListener('click', () => {
+      parseModal.classList.remove('open');
+      openEdit(null);
+      if(parsed.entryNumber) document.getElementById('f_entryNumber').value = parsed.entryNumber;
+      if(parsed.handler) document.getElementById('f_handler').value = parsed.handler;
+      if(parsed.department) document.getElementById('f_department').value = parsed.department;
+      if(parsed.subject) document.getElementById('f_subject').value = parsed.subject;
+      if(parsed.importance) document.getElementById('f_importance').value = parsed.importance;
+      pendingRawWaText = raw.trim();
+    });
+  }
+});
+
+// --- Modal closers / Filters ---
+document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => {
+  editModal.classList.remove('open');
+  detailModal.classList.remove('open');
+  parseModal.classList.remove('open');
+}));
+[editModal, detailModal, parseModal].forEach(m => m.addEventListener('click', e => { if(e.target === m) m.classList.remove('open'); }));
+
+document.getElementById('filterStatus').addEventListener('change', render);
+document.getElementById('filterImportance').addEventListener('change', render);
+document.getElementById('searchBox').addEventListener('input', render);
+
+render();
+setInterval(render, 60000);
+
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
+                              
