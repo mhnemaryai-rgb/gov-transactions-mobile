@@ -334,6 +334,35 @@ function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// --- نغمة تنبيه صوتية مميزة عند بلوغ أي ربع من مدة الإنجاز ---
+let audioCtx = null;
+function ensureAudioContext(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ audioCtx = null; }
+  }
+  if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume().catch(() => {}); }
+  return audioCtx;
+}
+function playAlertChime(){
+  const ctx = ensureAudioContext();
+  if(!ctx) return;
+  const now = ctx.currentTime;
+  const notes = [880, 1108.73, 1318.51, 1760]; // نغمة صاعدة مميزة (لا-دو#-مي-لا)
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const start = now + i * 0.14;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.4, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.38);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.42);
+  });
+}
+
 function loadData(){
   const raw = localStorage.getItem(STORAGE_KEY);
   if(raw) return JSON.parse(raw);
@@ -458,6 +487,7 @@ function render(){
 
 function checkQuarterAlerts(){
   let changed = false;
+  let shouldPlaySound = false;
   data.forEach(tx => {
     if(tx.issueNumber || !tx.hasDuration || !tx.durationHours) return;
     const percent = (elapsedHoursOf(tx) / tx.durationHours) * 100;
@@ -474,22 +504,28 @@ function checkQuarterAlerts(){
       changed = true;
       const text = `بلغت المعاملة رقم ${tx.entryNumber} الربع ${QUARTER_LABELS[qn-1]} من مدة الإنجاز المحددة.`;
       tx.history.push({time:new Date().toISOString(), text:'تنبيه نظام: ' + text});
-      if(tx.reminders.browser && 'Notification' in window && Notification.permission === 'granted'){
-        new Notification('تنبيه متابعة معاملة', {body:text});
+      if(tx.reminders.browser){
+        shouldPlaySound = true;
+        if('Notification' in window && Notification.permission === 'granted'){
+          new Notification('تنبيه متابعة معاملة', {body:text});
+        }
       }
     });
   });
+  if(shouldPlaySound) playAlertChime();
   if(changed) saveData(data);
 }
 
 // --- إشعارات محلية على الجهاز عند بلوغ أرباع مدة الإنجاز (بدون أي خادم) ---
 document.getElementById('notifyBtn').addEventListener('click', () => {
-  if(!('Notification' in window)){ alert('هذا المتصفح لا يدعم الإشعارات.'); return; }
+  ensureAudioContext();
+  playAlertChime();
+  if(!('Notification' in window)){ alert('هذا المتصفح لا يدعم الإشعارات، لكن النغمة الصوتية مفعّلة الآن.'); return; }
   Notification.requestPermission().then(p => {
     if(p === 'granted'){
-      new Notification('تم تفعيل إشعارات المتابعة', {body:'سيتم تنبيهك عند بلوغ نقاط التنبيه المحددة لكل معاملة، طالما التطبيق مفتوحًا أو في الخلفية القريبة على هذا الجهاز.'});
+      new Notification('تم تفعيل إشعارات المتابعة', {body:'سيتم تنبيهك بنغمة صوتية مميزة وإشعار على الشاشة عند بلوغ نقاط التنبيه المحددة لكل معاملة، طالما التطبيق مفتوحًا أو في الخلفية القريبة على هذا الجهاز.'});
     } else {
-      alert('لم يتم منح إذن الإشعارات. يمكنك تفعيله لاحقًا من إعدادات المتصفح/الجهاز لهذا الموقع.');
+      alert('تم تفعيل النغمة الصوتية، لكن لم يتم منح إذن الإشعارات على الشاشة. يمكنك تفعيله لاحقًا من إعدادات المتصفح/الجهاز لهذا الموقع.');
     }
   });
 });
