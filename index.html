@@ -172,6 +172,7 @@
   <div class="spacer"></div>
   <div class="alert-badge" id="alertBadge" style="display:none"></div>
   <button class="btn btn-ghost" id="parseWaBtn">📋 قراءة نص واتساب</button>
+  <button class="btn btn-ghost" id="enablePushBtn">🔔 تفعيل الإشعارات الحقيقية</button>
   <button class="btn btn-primary" id="addBtn">+ معاملة جديدة</button>
 </div>
 
@@ -297,6 +298,9 @@
 
 <script>
 const STORAGE_KEY = 'txTrackerMobileData_v1';
+// عنوان خادم الإشعارات الحقيقية (Push) — يُضبط بعد نشر الخادم على استضافة مجانية.
+const PUSH_SERVER_URL = '';
+const VAPID_PUBLIC_KEY = 'BHp2sG6pVzzi5FvgZf9YJVVm_kwZxrkW3-hn1jTaohbF2Ece-si3WT2m0V6FeHgLmQNVbG6_TQRJbueRvDXIlCc';
 const STATUS_LABELS = {processing:'قيد المعالجة', soon:'يقترب الموعد', late:'متأخر', issued:'تم التصدير'};
 const IMPORTANCE_LABELS = {normal:'عادي', urgent:'عاجل', secret:'سري'};
 const QUARTER_LABELS = ['الأول','الثاني','الثالث','الرابع'];
@@ -331,6 +335,88 @@ function updateHijriHint(inputId, hintId){
 }
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// --- إشعارات Push حقيقية (تصل حتى لو كان التطبيق مغلقًا تمامًا) ---
+function getDeviceId(){
+  let id = localStorage.getItem('txTrackerDeviceId');
+  if(!id){
+    id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('txTrackerDeviceId', id);
+  }
+  return id;
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; ++i){ outputArray[i] = rawData.charCodeAt(i); }
+  return outputArray;
+}
+
+async function enableRealPush(){
+  if(!PUSH_SERVER_URL){
+    alert('لم يتم ضبط خادم الإشعارات الحقيقية بعد.');
+    return;
+  }
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    alert('متصفحك لا يدعم الإشعارات الحقيقية.');
+    return;
+  }
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      alert('لم يتم منح إذن الإشعارات من إعدادات الجهاز/المتصفح.');
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await fetch(PUSH_SERVER_URL + '/api/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({deviceId: getDeviceId(), subscription: sub.toJSON()}),
+    });
+    localStorage.setItem('txTrackerPushEnabled', '1');
+    await syncReminders();
+    alert('تم تفعيل الإشعارات الحقيقية. ستصلك تنبيهات الأرباع حتى لو كان التطبيق مغلقًا.');
+  }catch(e){
+    alert('تعذر تفعيل الإشعارات: ' + e.message);
+  }
+}
+
+async function syncReminders(){
+  if(!PUSH_SERVER_URL) return;
+  if(localStorage.getItem('txTrackerPushEnabled') !== '1') return;
+  const eligible = data.filter(tx =>
+    tx.hasDuration && tx.durationHours && !tx.issueNumber &&
+    tx.reminders?.quarters &&
+    (tx.reminders.quarters.q1 || tx.reminders.quarters.q2 || tx.reminders.quarters.q3 || tx.reminders.quarters.q4)
+  );
+  const payload = eligible.map(tx => ({
+    id: tx.id,
+    entryNumber: tx.entryNumber,
+    handler: tx.handler,
+    subject: tx.subject,
+    entryDateTime: tx.entryDateTime,
+    durationHours: tx.durationHours,
+    quarters: tx.reminders.quarters,
+    notifiedQuarters: tx.notifiedQuarters || [],
+  }));
+  try{
+    await fetch(PUSH_SERVER_URL + '/api/sync', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({deviceId: getDeviceId(), transactions: payload}),
+    });
+  }catch(e){ /* بدون اتصال - سيُعاد المحاولة بالمزامنة التالية */ }
 }
 
 function loadData(){
@@ -485,6 +571,8 @@ if('Notification' in window && Notification.permission === 'default'){
   // لا نطلب الإذن تلقائيًا؛ نتركه اختياريًا عبر تفاعل المستخدم لاحقًا إن رغب (يمكن إضافته من إعدادات الجهاز).
 }
 
+document.getElementById('enablePushBtn').addEventListener('click', enableRealPush);
+
 // --- Add/Edit modal ---
 const editModal = document.getElementById('editModal');
 document.getElementById('addBtn').addEventListener('click', () => openEdit(null));
@@ -567,6 +655,7 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     data.push(newTx);
   }
   saveData(data);
+  syncReminders();
   editModal.classList.remove('open');
   render();
 });
@@ -575,6 +664,7 @@ function deleteTx(id){
   if(!confirm('حذف هذه المعاملة نهائيًا؟')) return;
   data = data.filter(t => t.id !== id);
   saveData(data);
+  syncReminders();
   render();
 }
 
@@ -645,6 +735,7 @@ function renderIssueForm(tx){
     tx.issueDateTime = dt;
     tx.history.push({time:new Date().toISOString(), text:`تسجيل رقم الصادر: ${num} بتاريخ ${formatDateTime(dt)}`});
     saveData(data);
+    syncReminders();
     refreshDetail();
     render();
   });
@@ -832,6 +923,7 @@ document.getElementById('searchBox').addEventListener('input', render);
 
 render();
 setInterval(render, 60000);
+syncReminders();
 
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   navigator.serviceWorker.register('sw.js').catch(() => {});
