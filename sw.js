@@ -1,5 +1,5 @@
-// Service worker بسيط: يخزّن ملفات التطبيق مؤقتًا ليعمل بدون إنترنت بعد أول فتح.
-const CACHE_NAME = 'tx-tracker-mobile-v2';
+// Service worker: يحاول الشبكة أولاً لجلب أحدث نسخة، ويستخدم النسخة المخزّنة فقط عند عدم توفر إنترنت.
+const CACHE_NAME = 'tx-tracker-mobile-v3';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -18,8 +18,16 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// شبكة أولاً: عند توفر إنترنت يجلب أحدث نسخة من الموقع تلقائيًا ويحدّث المخزن المؤقت،
+// وعند انقطاع الإنترنت يستخدم آخر نسخة محفوظة حتى يستمر التطبيق بالعمل بدون اتصال.
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => cached))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
